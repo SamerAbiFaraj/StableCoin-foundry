@@ -39,6 +39,8 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TokenAddressAndPriceFeedAddressesMustBeSameLength();
     error DSCEngine__NotAllowedToken();
     error DSCEngine__TransferFailed();
+    error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
+    error DSCEngine_MintFailed();
 
     ////////////////////////////
     ///  STATE VARIABLES  ////////////
@@ -50,6 +52,9 @@ contract DSCEngine is ReentrancyGuard {
     address[] private s_collateralTokens;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
+    uint256 private constant LIQUIDATION_PRECISION = 100; //
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     DecentralizedStableCoin private immutable i_dsc;
 
@@ -127,14 +132,19 @@ contract DSCEngine is ReentrancyGuard {
     // $200 ETH they can mint 20 DSC
     //once we deposit collateral (ie: depositCollateral function) than we should mint the DSC token
     /**
-     * @notice Follows CEI  (Check, Execute , Interaction)
+     * @notice Follows CEI  (Check, Effects , Interactions)
      * @param amountDscToMint  The amount of decentralized stablecoin to mint
      * @notice  They must have more collateral value than the minimum threshold
      */
     function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
         //if they minted too much ($150 DSC for $100ETH)
-        revertIfHealthFactorIsBroken(msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+
+        bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+        if (!minted) {
+            revert DSCEngine_MintFailed();
+        }
     }
 
     function burnDsc() external {}
@@ -185,10 +195,23 @@ contract DSCEngine is ReentrancyGuard {
         // Need to get the Total DSC minted
         // total collateral VALUE
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+
+        //ex: 1000 ETH * 50 = 50,000/100 = 500
+        //ex: $150 Eth * 50 = 7500 = (7500/100)v== since solidity does not have decials 75 would mean that we are undercollateralized now
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+
+        //ex: $1000 ETH  and  100 DSC
+        // collateralAdjustedForThreshold = $1000*50 / 100 ==> 500
+        // return:  500*1e18/100 ==> 5*1e18  (which is greather than 1 meaning this person is good and overcollaterized)
+        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
     }
 
-    function revertIfHealthFactorIsBroken(address user) internal view {
-        //1. Check health factor (do they have enough collateral?)
-        //2. Revert if they dont
+    //1. Check health factor (do they have enough collateral?)
+    //2. Revert if they dont
+    function _revertIfHealthFactorIsBroken(address user) internal view {
+        uint256 userHealthFactor = _healthFactor(user);
+        if (userHealthFactor < MIN_HEALTH_FACTOR) {
+            revert DSCEngine__BreaksHealthFactor(userHealthFactor);
+        }
     }
 }
