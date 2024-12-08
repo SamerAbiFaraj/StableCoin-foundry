@@ -5,7 +5,7 @@ pragma solidity ^0.8.19;
 import {Script} from "forge-std/Script.sol";
 import {DSCEngine} from "../src/DSCEngine.sol";
 import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
-import {HelperConfig} from "./HelpConfig.s.sol";
+import {HelperConfig} from "./HelperConfig.s.sol";
 
 contract DeployDSC is Script {
     address[] public tokenAddresses;
