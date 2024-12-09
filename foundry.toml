@@ -1,3 +1,4 @@
+
 [profile.default]
 src = "src"
 out = "out"
@@ -6,4 +7,11 @@ remappings = [
     "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts",
     "@chainlink/contracts=lib/chainlink-brownie-contracts/",
 ]
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# means stateful fuzz testing. Running random data on to many functions within your contract
+[invariant]
+run = 128
+depth = 128
+fail_on_revert = true
+# number of calls in a single run
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-optionsruns = 128  # number of runs
