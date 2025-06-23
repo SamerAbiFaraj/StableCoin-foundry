@@ -81,10 +81,14 @@ contract Handler is Test {
 
     // This breaks our invariant test suite because if price flucates to fast (like one block or so) the system(protocol) will crash!!
     // Best to see how to update the code to take sure situations into account
-    // function updateCollateralPrice(uint96 newPrice) public {
-    //     int256 newPriceInt = int256(uint256(newPrice));
-    //     ethUsdPriceFeed.updateAnswer(newPriceInt);
-    // }
+    function updateCollateralPrice(uint96 newPrice) public {
+        // Bound the new price to avoid extremely unrealistic values in fuzzing, e.g., 0 or excessively large.
+        // Price feeds usually have a min/max answer. For fuzzing, let's use a reasonable range.
+        // ETH price in USD, 8 decimals. $1 to $1,000,000,000
+        newPrice = uint96(bound(uint256(newPrice), 1e8, 1_000_000_000e8));
+        int256 newPriceInt = int256(uint256(newPrice)); // Ensure it's positive from bound
+        ethUsdPriceFeed.updateAnswer(newPriceInt);
+    }
 
     //Helper Function
     function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {
